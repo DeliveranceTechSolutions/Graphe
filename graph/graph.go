@@ -33,10 +33,13 @@ func (g Graph) IsPlanar() {
 
 }
 
-func (g Graph) IsBiparte() {
+func (g Graph) IsBiparte() (biparte bool) {
 	for vertex, neighbors := range g.vertices {
-		if _, ok := neighbors.nextDoor[vertex]; !ok {
-			
+		if _, ok := neighbors.nextDoor[vertex]; ok {
+			return
 		}
 	}
+
+	biparte = true
+	return
 }
