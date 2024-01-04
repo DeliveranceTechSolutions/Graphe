@@ -23,7 +23,7 @@ type Graph struct {
 
 type Vertex struct {
 	degree int32
-	neighbors map[*Vertex][]Vertex
+	neighbors map[*Edge][]Vertex
 }
 
 type Edge struct {
@@ -40,34 +40,51 @@ func NewCore() Interface {
 	}
 }
 
-func (g *graph) Add(value int32) error {
-	for _, vertex := range g.instance.vertices {
-		// should this be a map or a priority queue?
-		// Do I want to determine where it should be?
-		// Should there be a sorting algo that organizes?
-		// If sort algo, then concurrency in live system
-		// otherwise, copy and organize, or organize real-time with rw
-		// keep unorganized and determin relationships when Adding?
-	}
-
-	g.instance.vertices = append(g.instance.vertices, &Vertex{
+func (g *graph) Add(value int32, edge *Edge) {
+	edges := make(map[*Edge][]Vertex)
+	vertex := &Vertex{
 		degree: value,
-		neighbors: make(map[*Vertex][]Vertex)
-	})
-
+		neighbors: edges,
+	}
+	
+	var didWrite bool
+	for _, possible := range g.instance.vertices {
+		if _, ok := possible.neighbors[egde]; ok {
+			if possibleEdge.weight == edge.weight {
+				g.rw.Lock()
+					g.instance.vertices.neighbors[possibleEdge] = append(
+						g.instance.vertices.neighbors[possibleEdge],
+						vertex,
+					)
+					vertex.neighors[possibleEdge] = append(
+						vertex.neighbors[edge],
+						g.instance.vertices.neighbors[possibleEdge]...,
+					)
+					didWrite = true
+					break
+				g.rw.Unlock()
+				return
+			}
+		}
+	}
+	
+	// default case, else on a map lookup is bad form, but might be better syntax
+	vertex[edge] = struct{}{}
+	return
 }
+
 
 func (g *graph) IsCyclical(ctx context.Context) (bool, error) {
 	select {
 	case <-ctx.Done():
 		return false, ctx.Err()
 	default:
-	//	vIsited := make(map[Vertex}struct{})
+	//	visited := make(map[Vertex}struct{})
 	//	for _, vertex := graphe.vertices {
-	//		if _, ok := vIsited[vertex]; ok {
+	//		if _, ok := visited[vertex]; ok {
 	//			return true, nil
 	//		}
-	//		vIsited[vertex] = struct{}{}
+	//		visited[vertex] = struct{}{}
 	//	}
 	}
 
@@ -78,12 +95,12 @@ func (g *graph) IsConnected(ctx context.Context, a, b int32) (bool, error) {
 	case <-ctx.Done():
 		return false, ctx.Err()
 	default:
-	//	vIsited := make(map[Vertex}struct{})
+	//	visited := make(map[Vertex}struct{})
 	//	for _, vertex := graphe.vertices {
-	//		if _, ok := vIsited[vertex]; ok {
+	//		if _, ok := visited[vertex]; ok {
 	//			return false, nil
 	//		}
-	//		vIsited[vertex] = struct{}{}
+	//		visited[vertex] = struct{}{}
 	//	}
 	}
 
@@ -95,12 +112,12 @@ func (g *graph) IsPlanar(ctx context.Context) (bool, error) {
 	case <-ctx.Done():
 		return false, ctx.Err()
 	default:
-	//	vIsited := make(map[Vertex}struct{})
+	//	visited := make(map[Vertex}struct{})
 	//	for _, vertex := graphe.vertices {
-	//		if _, ok := vIsited[vertex]; ok {
+	//		if _, ok := visited[vertex]; ok {
 	//			return false, nil
 	//		}
-	//		vIsited[vertex] = struct{}{}
+	//		visited[vertex] = struct{}{}
 	//	}
 	}
 
@@ -113,20 +130,20 @@ func (g *graph) IsBipartite(ctx context.Context) (int32, error) {
 	default:
 	//	var template strings.Builder
 
-	//	vIsited := make(map["string"}struct{})
+	//	visited := make(map["string"}struct{})
 	//	for _, vertex := graphe.vertices {
 	//		template.WriteString(string(vertex.degree))
 	//		template.WriteRune(',')
 
 	//		// locking for map reading Is essential
 	//		graphe.rw.RLock()
-	//		for _, neighborhood := range vIsited {
+	//		for _, neighborhood := range visited {
 	//			if !strings.Contain(neighborhood, template.String()) {
 	//				// using the greedy lock for writing
 	//				// therefore, nodes won't be mIssed in any check, 
 	//				// especially if broken into goroutines
 	//				graphe.rw.Lock()
-	//				vIsited[template.String()] = struct{}	
+	//				visited[template.String()] = struct{}	
 	//				graphe.rw.Unlock()
 	//			}
 	//		}
@@ -135,7 +152,7 @@ func (g *graph) IsBipartite(ctx context.Context) (int32, error) {
 	//		template.Clear()
 	//	}
 
-	//	return len(vIsited), nil
+	//	return len(visited), nil
 	}
 
 	return -1, nil
