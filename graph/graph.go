@@ -2,14 +2,17 @@ package graph
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
-type Interface interface {
+type IGraph interface {
 	IsCyclical(context.Context) (bool, error)
 	IsConnected(context.Context,int32,int32) (bool, error)
 	IsPlanar(context.Context) (bool, error)
 	IsBipartite(context.Context) (int32, error)
+	Add(int32,int32,...EmailVertex)
+	Execute()
 }
 
 type graph struct {
@@ -23,14 +26,54 @@ type Graph struct {
 
 type Vertex struct {
 	degree int32
-	neighbors map[*Edge][]Vertex
+	edges []int32
+	subgraph map[EmailVertex]struct{}
 }
 
-type Edge struct {
-	weight int32
+type EmailVertex int8
+
+// Any request coming in that is most nessecary to execute first
+// needs to maintain the bottom position
+const (
+	ThankYou EmailVertex = iota + 1
+	Prayer
+	Book
+)
+
+type any interface{}
+
+// conversely, this switch statement will be opposite order, to process the heavier execution first
+func (g *graph) Execute() {
+	var once *sync.Once
+	var execute func(EmailVertex)
+
+	execute = func(opt EmailVertex) {
+		switch opt {
+		case Book:
+			once.Do(func() {
+				fmt.Println("Book")				
+			})
+		case Prayer:
+			once.Do(func() {
+				fmt.Println("Prayer")				
+			})
+		case ThankYou:
+			once.Do(func() {
+				fmt.Println("ThankYou")	
+			})
+		}
+	}()
+
+	for _, vertice := range g.instance.vertices {
+		for task := range vertice.subgraph {
+			execute(task)	
+		}
+	}
+
+	return nil
 }
 
-func NewCore() Interface {
+func NewCore() IGraph {
 	var rw sync.RWMutex
 	return &graph{
 		rw: &rw,
@@ -40,36 +83,62 @@ func NewCore() Interface {
 	}
 }
 
-func (g *graph) Add(value int32, edge *Edge) {
-	edges := make(map[*Edge][]Vertex)
-	vertex := &Vertex{
-		degree: value,
-		neighbors: edges,
+func (g *graph) Add(degree int32, edge int32, tasks ...EmailVertex) {
+	edges := make([]int32, 0)
+	length := len(g.instance.vertices)
+	subgraph := make(map[EmailVertex]struct{})
+	vertex := Vertex{
+		degree: degree,
+		edges: edges,
+		subgraph: subgraph,
 	}
+	// Graph{ []Vertex{ degree, edges, subgraph } }
 	
-	var didWrite bool
-	for _, possible := range g.instance.vertices {
-		if _, ok := possible.neighbors[egde]; ok {
-			if possibleEdge.weight == edge.weight {
+	for _, vertice :=
+	switch opts {
+	case opts == Book:
+		once.Do(func() {
+			fmt.Println("Book")				
+		})
+	case opts == Prayer:
+		once.Do(func() {
+			fmt.Println("Prayer")				
+		})
+	case opts == ThankYou:
+		once.Do(func() {
+			fmt.Println("ThankYou")	
+		})
+	}
+range g.instance.vertices {
+		if vertice.degree == degree {
+			for _, task := range tasks {
+				g.rw.RLock()
+				if _, ok := vertice.subgraph[task]; !ok {
+				g.rw.RUnlock()
 				g.rw.Lock()
-					g.instance.vertices.neighbors[possibleEdge] = append(
-						g.instance.vertices.neighbors[possibleEdge],
-						vertex,
-					)
-					vertex.neighors[possibleEdge] = append(
-						vertex.neighbors[edge],
-						g.instance.vertices.neighbors[possibleEdge]...,
-					)
-					didWrite = true
-					break
+
+					vertice.subgraph[task] = struct{}{}
+
 				g.rw.Unlock()
-				return
+				g.rw.RLock()
+				}
+				g.rw.RUnlock()
 			}
+
+			return
 		}
 	}
 	
 	// default case, else on a map lookup is bad form, but might be better syntax
-	vertex[edge] = struct{}{}
+	if length == len(g.instance.vertices) {
+		g.rw.Lock()
+			for _, task := range tasks {
+				vertex.subgraph[task] = struct{}{}
+			}
+			g.instance.vertices = append(g.instance.vertices, vertex)
+		g.rw.Unlock()
+
+	}
 	return
 }
 
