@@ -2,7 +2,6 @@ package graph
 
 import (
 	"context"
-	"fmt"
 	"sync"
 )
 
@@ -11,7 +10,7 @@ type IGraph interface {
 	IsConnected(context.Context,int32,int32) (bool, error)
 	IsPlanar(context.Context) (bool, error)
 	IsBipartite(context.Context) (int32, error)
-	Add(int32,int32,*sync.WaitGroup,...EmailVertex)
+	Add(int32,int32,...EmailVertex)
 	Execute(*sync.WaitGroup)
 }
 
@@ -66,35 +65,30 @@ func (g *graph) Execute(hwg *sync.WaitGroup) {
 	defer hwg.Done()
 
 	var wg sync.WaitGroup
-	var execute func(EmailVertex,*sync.WaitGroup)
+	var execute func(EmailVertex)
 	var evh EmailVertexHandler
-	execute = func(opt EmailVertex, wg *sync.WaitGroup) {
+	execute = func(opt EmailVertex) {
 		defer wg.Done()
-		
 		switch opt.Value() {
 		case Book.Value():
-			fmt.Println("Book")				
+			// fmt.Println("Book")				
 		case Prayer.Value():
-			fmt.Println("Prayer")				
+			// fmt.Println("Prayer")				
 		case ThankYou.Value():
-			fmt.Println("ThankYou")				
+			// fmt.Println("ThankYou")				
 		}
 	}
 	
-	var counter int
-	wg.Add(1)
+	wg.Add(len(g.instance.vertices) + 1)
 	go func(vertices []Vertex) {
-		wg.Add(len(vertices))
+		defer wg.Done()
 		for _, selection := range vertices {
-			fmt.Println(counter)
 			go func(selection Vertex) {
 				evh.selection = selection.subgraph
 				heaviest := evh.Heaviest()
-				execute(heaviest, &wg)
+				execute(heaviest)
 			}(selection)
-			counter++
 		}
-	wg.Done()
 	}(g.instance.vertices)
 	wg.Wait()
 
@@ -111,7 +105,7 @@ func NewCore() IGraph {
 	}
 }
 
-func (g *graph) Add(degree int32, edge int32, wg *sync.WaitGroup, tasks ...EmailVertex) {
+func (g *graph) Add(degree int32, edge int32, tasks ...EmailVertex) {
 	edges := make([]int32, 0)
 	length := len(g.instance.vertices)
 	subgraph := make(map[EmailVertex]struct{})
@@ -120,7 +114,6 @@ func (g *graph) Add(degree int32, edge int32, wg *sync.WaitGroup, tasks ...Email
 		edges: edges,
 		subgraph: subgraph,
 	}
-	// Graph{ []Vertex{ degree, edges, subgraph } }
 	
 	for _, vertice := range g.instance.vertices {
 		if vertice.degree == degree {
