@@ -65,41 +65,39 @@ type any interface{}
 
 // conversely, this switch statement will be opposite order, to process the heavier execution first
 func (g *graph) Execute() {
-	var once *sync.Once
-	var wg *sync.WaitGroup
+	var wg sync.WaitGroup
 	var execute func(EmailVertex,*sync.WaitGroup)
 	var evh EmailVertexHandler
 
 			
 	execute = func(opt EmailVertex, wg *sync.WaitGroup) {
 		defer wg.Done()
+//		var once *sync.Once
+		
 		switch opt {
 		case Book:
-			once.Do(func() {
-				fmt.Println("Book")				
-			})
+			fmt.Println("Book")				
 		case Prayer:
-			once.Do(func() {
-				fmt.Println("Prayer")				
-			})
+			fmt.Println("Prayer")				
 		case ThankYou:
-			once.Do(func() {
-				fmt.Println("ThankYou")	
-			})
+			fmt.Println("ThankYou")	
 		}
 	}
 
 	wg.Add(1)
-	go func() {
-		wg.Add(len(g.instance.vertices))
-		for _, selection := range g.instance.vertices {
-			go func() {
+	go func(vertices []Vertex) {
+		for _, selection := range vertices {
+			wg.Add(1)
+			go func(selection Vertex) {
 				evh.selection = selection.subgraph
 				heaviest := evh.Heaviest()
-				execute(heaviest, wg)
-			}()
+				wg.Add(1)
+				go execute(heaviest, &wg)
+				wg.Done()
+			}(selection)
 		}
-	}()
+		wg.Done()
+	}(g.instance.vertices)
 	wg.Wait()
 
 	return
