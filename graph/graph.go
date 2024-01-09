@@ -31,6 +31,9 @@ type Vertex struct {
 }
 
 type EmailVertex int8
+type EmailVertexHandler struct {
+	selection map[EmailVertex]struct{}
+}
 
 // Any request coming in that is most nessecary to execute first
 // needs to maintain the bottom position
@@ -40,14 +43,36 @@ const (
 	Book
 )
 
+func (ev EmailVertex) Value() int8 {
+	return int8(ev)
+}
+
+func (evh EmailVertexHandler) Heaviest() (maxOpt EmailVertex) {
+	defer func() {
+		var max int8
+		for emailVert := range evh.selection {
+			if v := emailVert.Value(); max > v {
+				max = v
+				maxOpt = emailVert
+			}
+		}
+	}()
+
+	return 
+}
+
 type any interface{}
 
 // conversely, this switch statement will be opposite order, to process the heavier execution first
 func (g *graph) Execute() {
 	var once *sync.Once
-	var execute func(EmailVertex)
+	var wg *sync.WaitGroup
+	var execute func(EmailVertex,*sync.WaitGroup)
+	var evh EmailVertexHandler
 
-	execute = func(opt EmailVertex) {
+			
+	execute = func(opt EmailVertex, wg *sync.WaitGroup) {
+		defer wg.Done()
 		switch opt {
 		case Book:
 			once.Do(func() {
@@ -62,15 +87,22 @@ func (g *graph) Execute() {
 				fmt.Println("ThankYou")	
 			})
 		}
-	}()
-
-	for _, vertice := range g.instance.vertices {
-		for task := range vertice.subgraph {
-			execute(task)	
-		}
 	}
 
-	return nil
+	wg.Add(1)
+	go func() {
+		wg.Add(len(g.instance.vertices))
+		for _, selection := range g.instance.vertices {
+			go func() {
+				evh.selection = selection.subgraph
+				heaviest := evh.Heaviest()
+				execute(heaviest, wg)
+			}()
+		}
+	}()
+	wg.Wait()
+
+	return
 }
 
 func NewCore() IGraph {
@@ -94,22 +126,7 @@ func (g *graph) Add(degree int32, edge int32, tasks ...EmailVertex) {
 	}
 	// Graph{ []Vertex{ degree, edges, subgraph } }
 	
-	for _, vertice :=
-	switch opts {
-	case opts == Book:
-		once.Do(func() {
-			fmt.Println("Book")				
-		})
-	case opts == Prayer:
-		once.Do(func() {
-			fmt.Println("Prayer")				
-		})
-	case opts == ThankYou:
-		once.Do(func() {
-			fmt.Println("ThankYou")	
-		})
-	}
-range g.instance.vertices {
+	for _, vertice := range g.instance.vertices {
 		if vertice.degree == degree {
 			for _, task := range tasks {
 				g.rw.RLock()
