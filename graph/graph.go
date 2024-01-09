@@ -11,8 +11,8 @@ type IGraph interface {
 	IsConnected(context.Context,int32,int32) (bool, error)
 	IsPlanar(context.Context) (bool, error)
 	IsBipartite(context.Context) (int32, error)
-	Add(int32,int32,...EmailVertex)
-	Execute()
+	Add(int32,int32,*sync.WaitGroup,...EmailVertex)
+	Execute(*sync.WaitGroup)
 }
 
 type graph struct {
@@ -48,15 +48,13 @@ func (ev EmailVertex) Value() int8 {
 }
 
 func (evh EmailVertexHandler) Heaviest() (maxOpt EmailVertex) {
-	defer func() {
-		var max int8
-		for emailVert := range evh.selection {
-			if v := emailVert.Value(); max > v {
-				max = v
-				maxOpt = emailVert
-			}
+	var max int8
+	for emailVert := range evh.selection {
+		if v := emailVert.Value(); max < v {
+			max = v
+			maxOpt = emailVert
 		}
-	}()
+	}
 
 	return 
 }
@@ -64,39 +62,39 @@ func (evh EmailVertexHandler) Heaviest() (maxOpt EmailVertex) {
 type any interface{}
 
 // conversely, this switch statement will be opposite order, to process the heavier execution first
-func (g *graph) Execute() {
+func (g *graph) Execute(hwg *sync.WaitGroup) {
+	defer hwg.Done()
+
 	var wg sync.WaitGroup
 	var execute func(EmailVertex,*sync.WaitGroup)
 	var evh EmailVertexHandler
-
-			
 	execute = func(opt EmailVertex, wg *sync.WaitGroup) {
 		defer wg.Done()
-//		var once *sync.Once
 		
-		switch opt {
-		case Book:
+		switch opt.Value() {
+		case Book.Value():
 			fmt.Println("Book")				
-		case Prayer:
+		case Prayer.Value():
 			fmt.Println("Prayer")				
-		case ThankYou:
-			fmt.Println("ThankYou")	
+		case ThankYou.Value():
+			fmt.Println("ThankYou")				
 		}
 	}
-
+	
+	var counter int
 	wg.Add(1)
 	go func(vertices []Vertex) {
+		wg.Add(len(vertices))
 		for _, selection := range vertices {
-			wg.Add(1)
+			fmt.Println(counter)
 			go func(selection Vertex) {
 				evh.selection = selection.subgraph
 				heaviest := evh.Heaviest()
-				wg.Add(1)
-				go execute(heaviest, &wg)
-				wg.Done()
+				execute(heaviest, &wg)
 			}(selection)
+			counter++
 		}
-		wg.Done()
+	wg.Done()
 	}(g.instance.vertices)
 	wg.Wait()
 
@@ -113,7 +111,7 @@ func NewCore() IGraph {
 	}
 }
 
-func (g *graph) Add(degree int32, edge int32, tasks ...EmailVertex) {
+func (g *graph) Add(degree int32, edge int32, wg *sync.WaitGroup, tasks ...EmailVertex) {
 	edges := make([]int32, 0)
 	length := len(g.instance.vertices)
 	subgraph := make(map[EmailVertex]struct{})
