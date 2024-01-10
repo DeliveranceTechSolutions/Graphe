@@ -3,6 +3,7 @@ package graph
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type IGraph interface {
@@ -10,8 +11,8 @@ type IGraph interface {
 	IsConnected(context.Context,int32,int32) (bool, error)
 	IsPlanar(context.Context) (bool, error)
 	IsBipartite(context.Context) (int32, error)
-	Add(int32,int32,...EmailVertex)
-	Execute(*sync.WaitGroup)
+	Append(context.Context,int32,int32,chan Vertex,...EmailVertex)
+	Execute(context.Context,chan Vertex)
 }
 
 type graph struct {
@@ -29,6 +30,10 @@ type Vertex struct {
 	subgraph map[EmailVertex]struct{}
 }
 
+// EVH EmailVertexHandler is an important concept when these events
+// begin to be broken off into it's own environment
+// this will take in the selection, but also the
+// email metadata (i.e. sender name, title, other people mentioned, etc.)
 type EmailVertex int8
 type EmailVertexHandler struct {
 	selection map[EmailVertex]struct{}
@@ -46,6 +51,10 @@ func (ev EmailVertex) Value() int8 {
 	return int8(ev)
 }
 
+// Heaviest will determine what process will manage the email creation
+// eventually the idea is to create DAG edges with the heaviest weight.
+// Therefore, a k8s cluster can handle Book, ThankYou, etc. essentially
+// future load-balancing within the system's requests. 
 func (evh EmailVertexHandler) Heaviest() (maxOpt EmailVertex) {
 	var max int8
 	for emailVert := range evh.selection {
@@ -61,38 +70,27 @@ func (evh EmailVertexHandler) Heaviest() (maxOpt EmailVertex) {
 type any interface{}
 
 // conversely, this switch statement will be opposite order, to process the heavier execution first
-func (g *graph) Execute(hwg *sync.WaitGroup) {
-	defer hwg.Done()
-
-	var wg sync.WaitGroup
-	var execute func(EmailVertex)
+func (g *graph) Execute(ctx context.Context, loadCh chan Vertex) {
 	var evh EmailVertexHandler
-	execute = func(opt EmailVertex) {
-		defer wg.Done()
-		switch opt.Value() {
-		case Book.Value():
-			// fmt.Println("Book")				
-		case Prayer.Value():
-			// fmt.Println("Prayer")				
-		case ThankYou.Value():
-			// fmt.Println("ThankYou")				
+	
+	for {
+		select {
+		case <-ctx.Done():	
+			return 
+		case selection := <-loadCh:
+			evh.selection = selection.subgraph
+			switch evh.Heaviest() {
+			case Book:
+				// fmt.Println("Book")				
+			case Prayer:
+				// fmt.Println("Prayer")				
+			case ThankYou:
+				// fmt.Println("ThankYou")				
+			}
+		default:
+			time.Sleep(time.Second * 5)
 		}
 	}
-	
-	wg.Add(len(g.instance.vertices) + 1)
-	go func(vertices []Vertex) {
-		defer wg.Done()
-		for _, selection := range vertices {
-			go func(selection Vertex) {
-				evh.selection = selection.subgraph
-				heaviest := evh.Heaviest()
-				execute(heaviest)
-			}(selection)
-		}
-	}(g.instance.vertices)
-	wg.Wait()
-
-	return
 }
 
 func NewCore() IGraph {
@@ -105,7 +103,13 @@ func NewCore() IGraph {
 	}
 }
 
-func (g *graph) Add(degree int32, edge int32, tasks ...EmailVertex) {
+func (g *graph) Append(
+	ctx context.Context, 
+	degree int32, 
+	edge int32, 
+	loadCh chan Vertex, 
+	tasks ...EmailVertex,
+) {
 	edges := make([]int32, 0)
 	length := len(g.instance.vertices)
 	subgraph := make(map[EmailVertex]struct{})
@@ -130,7 +134,8 @@ func (g *graph) Add(degree int32, edge int32, tasks ...EmailVertex) {
 				}
 				g.rw.RUnlock()
 			}
-
+				
+			loadCh<-vertice	
 			return
 		}
 	}
@@ -138,13 +143,14 @@ func (g *graph) Add(degree int32, edge int32, tasks ...EmailVertex) {
 	// default case, else on a map lookup is bad form, but might be better syntax
 	if length == len(g.instance.vertices) {
 		g.rw.Lock()
-			for _, task := range tasks {
-				vertex.subgraph[task] = struct{}{}
-			}
-			g.instance.vertices = append(g.instance.vertices, vertex)
+		for _, task := range tasks {
+			vertex.subgraph[task] = struct{}{}
+		}
+		g.instance.vertices = append(g.instance.vertices, vertex)
 		g.rw.Unlock()
-
 	}
+	
+	loadCh<-vertex
 	return
 }
 

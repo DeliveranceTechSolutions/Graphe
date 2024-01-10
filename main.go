@@ -1,48 +1,39 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"sync"
 	"time"
 
  	"github.com/deliveranceTechSolutions/graphe/graph"
 )
 
 func driver() bool {
-	var load sync.WaitGroup
-	var execute sync.WaitGroup
-	// ctx, cancel := context.WithDeadline(context.Background(), time.Now())
-	// defer cancel()
+	// var load sync.WaitGroup
+	// var execute sync.WaitGroup
+
+	loadCh := make(chan graph.Vertex, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second * 30)
+	defer cancel()
+
 	g := graph.NewCore()
-	testConst := int32(1000)
-	testGroups := int(testConst)
+	testConst := int32(3000)
+//	testGroups := int(testConst)
 	start := time.Now()
 	defer func() {
 		fmt.Println("before end")
 		fmt.Println(time.Since(start))
 	}()
 
-	load.Add(testGroups + 1)
-	go func() {
-	defer load.Done()
-		for i := int32(0); i < int32(testConst); i++ {
-			go func(i int32, g graph.IGraph) {
-			defer load.Done()
-				g.Add(i, i, graph.ThankYou, graph.Book)
-			}(i, g)
-		}
-		
-	}()
-	load.Wait()
-
-	execute.Add(testGroups + 1)
-	go func() {
-	defer execute.Done()
-		for i := int32(0); i < int32(testConst); i++ {
-			go g.Execute(&execute)
-		}
-	}()
-	execute.Wait()	
+	for i := int32(0); i < int32(testConst); i++ {
+		weight := int32(graph.ThankYou.Value() + graph.Book.Value())
+		go g.Append(ctx, i, weight, loadCh, graph.ThankYou, graph.Book)
+	}
+	
+	for i := int32(0); i < int32(testConst); i++ {
+		fmt.Println(i)
+		go g.Execute(ctx, loadCh)
+	}
 
 	return true
 }
